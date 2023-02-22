@@ -23,7 +23,10 @@ export function makeSwrCache<F extends AsyncFunction>(
   const setCache = (key: string, item: Promise<SyncReturnType<F>>) => {
     cache.set(key, {
       validUntil: new Date(new Date().getTime() + ttl),
-      item,
+      item: item.catch((err) => {
+        cache.delete(key);
+        throw err;
+      }),
     });
   };
 
