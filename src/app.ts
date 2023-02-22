@@ -1,6 +1,8 @@
 import express from "express";
 import { getLiquidityItems } from "./stats";
 
+const port = process.env.PORT || 3000;
+
 export function bootstrapApp() {
   console.info("bootstrapping app...");
 
@@ -11,7 +13,7 @@ export function bootstrapApp() {
     res.send(items).status(200);
   });
 
-  app.listen(3000, () => {
-    console.info("app listening on port 3000!");
+  app.listen(port, () => {
+    console.info(`app listening on port ${port}`);
   });
 }
