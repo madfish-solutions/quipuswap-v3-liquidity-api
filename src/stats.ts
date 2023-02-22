@@ -151,14 +151,14 @@ export async function getLiquidityItems(): Promise<LiquidityItemResponse[]> {
     const liquidityItem: LiquidityItem = {
       id: idx.toFixed(),
       contractAddress: poolStat.address,
-      apr: apr.toNumber(), // TBD
-      maxApr: apr.toNumber(), // == apr
+      apr: apr.toNumber(),
+      maxApr: apr.toNumber(),
       feesRate: "0",
       poolLabels: [],
       opportunities: [],
       type: PoolType.UNISWAP,
       volumeForWeek: volumePerPeriodUsd.toFixed(),
-      totalSupply: poolStat.liquidity.toFixed(), // TBD
+      totalSupply: poolStat.liquidity.toFixed(),
       tvlInUsd: tvlUsd.toFixed(),
       tokensInfo: [
         makeTokenInfo(
