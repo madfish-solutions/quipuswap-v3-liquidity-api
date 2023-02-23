@@ -7,7 +7,7 @@ type SyncReturnType<T extends AsyncFunction> = T extends (
   : any;
 
 type SWRCache<Fetcher extends AsyncFunction> = {
-  get: (...args: any[]) => Promise<SyncReturnType<Fetcher>>;
+  get: (...args: Parameters<Fetcher>) => Promise<SyncReturnType<Fetcher>>;
 };
 
 type CacheItem<T> = {
@@ -30,7 +30,7 @@ export function makeSwrCache<F extends AsyncFunction>(
     });
   };
 
-  const get = (...args: any[]) => {
+  const get = (...args: Parameters<F>) => {
     const key = JSON.stringify(args);
     const cachedItem = cache.get(key);
 
