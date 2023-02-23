@@ -5,6 +5,7 @@ export interface Pool {
   address: string;
   token_x_id: number;
   token_y_id: number;
+  originated_at: Date;
 }
 
 export interface Token {

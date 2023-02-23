@@ -14,7 +14,11 @@ export function fetchAllTokens() {
 }
 
 export function fetchAllPools() {
-  return db.selectFrom("pool").selectAll().execute();
+  return db
+    .selectFrom("pool")
+    .selectAll()
+    .orderBy("pool.originated_at", "desc")
+    .execute();
 }
 
 export function fetchAllExchangeRates() {
