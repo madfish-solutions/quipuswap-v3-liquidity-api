@@ -71,7 +71,7 @@ export async function getPoolStats(days: number): Promise<PoolStat[]> {
 
       const [tokenXSupply, tokenYSupply] = await Promise.all([
         tokenBalanceCache.get(tokenX, pool.address),
-        tokenBalanceCache.get(tokenX, pool.address),
+        tokenBalanceCache.get(tokenY, pool.address),
       ]);
 
       return {
@@ -118,16 +118,20 @@ export async function getLiquidityItems(): Promise<LiquidityItemResponse[]> {
   const allExchangeRates = await allExchangeRatesCache.get();
   const block = await blockCache.get();
 
-  const getExchangeRate = (tokenAddress: string) =>
+  const getExchangeRate = (token: Token) =>
     allExchangeRates.find(
-      (exchangeRate) => exchangeRate.tokenAddress === tokenAddress
+      (exchangeRate) =>
+        exchangeRate.tokenAddress === token.address &&
+        (token.token_id !== null
+          ? exchangeRate.tokenId === Number(token.token_id)
+          : true)
     )?.exchangeRate || "0";
 
   return poolStats.map((poolStat, idx) => {
     const tokenX = poolStat.tokenX;
     const tokenY = poolStat.tokenY;
-    const tokenXExchangeRate = getExchangeRate(tokenX.address);
-    const tokenYExchangeRate = getExchangeRate(tokenY.address);
+    const tokenXExchangeRate = getExchangeRate(tokenX);
+    const tokenYExchangeRate = getExchangeRate(tokenY);
     const tokenXDecimalsDenominator = new BigNumber(10).pow(tokenX.decimals);
     const tokenYDecimalsDenominator = new BigNumber(10).pow(tokenY.decimals);
     const volumePerPeriodUsd = poolStat.totalDx

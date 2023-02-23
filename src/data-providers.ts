@@ -19,9 +19,13 @@ export function fetchAllPools() {
 
 export function fetchAllExchangeRates() {
   return axios
-    .get<Array<{ tokenAddress: string; exchangeRate: string }>>(
-      EXCHANGE_RATES_API
-    )
+    .get<
+      Array<{
+        tokenAddress: string;
+        exchangeRate: string;
+        tokenId: number | undefined;
+      }>
+    >(EXCHANGE_RATES_API)
     .then((res) => res.data);
 }
 
