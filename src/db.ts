@@ -44,13 +44,24 @@ export interface Database {
   swap: SwapWithGeneratedId;
 }
 
+const host = process.env.DB_HOST || "localhost";
+const database = process.env.DB_DATABASE || "postgres";
+const user = process.env.DB_USER || "postgres";
+const password = process.env.DB_PASSWORD || "changeme";
+const isSsl = process.env.DB_SSL === "true";
+
 export const db = new Kysely<Database>({
   dialect: new PostgresDialect({
     pool: new PgPool({
-      host: "localhost",
-      database: "postgres",
-      user: "postgres",
-      password: "changeme",
+      host,
+      database,
+      user,
+      password,
+      ssl: isSsl
+        ? {
+            rejectUnauthorized: false,
+          }
+        : undefined,
     }),
   }),
 });
