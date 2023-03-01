@@ -22,6 +22,9 @@ import {
 
 const { sum } = db.fn;
 
+const WTEZ_ADDRESS =
+  process.env.WTEZ_ADDRESS || "KT1UpeXdK6AJbX58GJ92pLZVCucn2DR8Nu4b";
+
 const allTokensCache = makeSwrCache(fetchAllTokens, 30000);
 const allPoolsCache = makeSwrCache(fetchAllPools, 30000);
 const allExchangeRatesCache = makeSwrCache(fetchAllExchangeRates, 60000);
@@ -30,16 +33,6 @@ const allPoolStatsCache = makeSwrCache(getPoolStats, 30000);
 const devFeeCache = makeSwrCache(fetchDevFee, 60000 * 60 * 6); // not changed too often
 const poolStorageCache = makeSwrCache(fetchPoolStorage, 30000);
 const blockCache = makeSwrCache(fetchBlock, 3000);
-
-async function getTokenById(id: number) {
-  const allTokens = await allTokensCache.get();
-  const token = allTokens.find((token) => token.id === id);
-  if (!token) {
-    throw new Error("failed to find token with id: " + id);
-  }
-
-  return token;
-}
 
 export async function getPoolStats(days: number): Promise<PoolStat[]> {
   const pools = await allPoolsCache.get();
@@ -90,42 +83,38 @@ export async function getPoolStats(days: number): Promise<PoolStat[]> {
   );
 }
 
-function makeTokenInfo(
-  token: Token,
-  tvl: string,
-  exchangeRate: string
-): TokensInfo {
-  return {
-    atomicTokenTvl: tvl,
-    token: {
-      fa2TokenId: token.token_id,
-      contractAddress: token.address,
-      isWhitelisted: false, // TBD
-      type: token.token_id ? Standard.Fa2 : Standard.Fa12,
-      metadata: {
-        decimals: token.decimals,
-        name: token.name,
-        symbol: token.symbol,
-        thumbnailUri: token.thumbnail_uri,
-      },
-    },
-    exchangeRate: exchangeRate,
-  };
+async function getTokenById(id: number) {
+  const allTokens = await allTokensCache.get();
+  const token = allTokens.find((token) => token.id === id);
+  if (!token) {
+    throw new Error("failed to find token with id: " + id);
+  }
+
+  return token;
 }
 
 export async function getLiquidityItems(): Promise<LiquidityItemResponse[]> {
   const poolStats = await allPoolStatsCache.get(7);
   const allExchangeRates = await allExchangeRatesCache.get();
   const block = await blockCache.get();
+  const tezExchangeRate =
+    allExchangeRates[allExchangeRates.length - 1].exchangeRate;
 
-  const getExchangeRate = (token: Token) =>
-    allExchangeRates.find(
-      (exchangeRate) =>
-        exchangeRate.tokenAddress === token.address &&
-        (token.token_id !== null
-          ? exchangeRate.tokenId === Number(token.token_id)
-          : true)
-    )?.exchangeRate || "0";
+  const getExchangeRate = (token: Token) => {
+    if (token.address === WTEZ_ADDRESS) {
+      return tezExchangeRate;
+    }
+
+    return (
+      allExchangeRates.find(
+        (exchangeRate) =>
+          exchangeRate.tokenAddress === token.address &&
+          (token.token_id !== null
+            ? exchangeRate.tokenId === Number(token.token_id)
+            : true)
+      )?.exchangeRate || "0"
+    );
+  };
 
   return poolStats.map((poolStat, idx) => {
     const tokenX = poolStat.tokenX;
@@ -153,7 +142,7 @@ export async function getLiquidityItems(): Promise<LiquidityItemResponse[]> {
       .div(tvlUsd);
 
     const liquidityItem: LiquidityItem = {
-      id: idx.toFixed(),
+      id: poolStat.id.toFixed(0),
       contractAddress: poolStat.address,
       apr: apr.toNumber(),
       maxApr: apr.toNumber(),
@@ -187,4 +176,27 @@ export async function getLiquidityItems(): Promise<LiquidityItemResponse[]> {
       },
     };
   });
+}
+
+function makeTokenInfo(
+  token: Token,
+  tvl: string,
+  exchangeRate: string
+): TokensInfo {
+  return {
+    atomicTokenTvl: tvl,
+    token: {
+      fa2TokenId: token.token_id,
+      contractAddress: token.address,
+      isWhitelisted: false, // TBD
+      type: token.token_id ? Standard.Fa2 : Standard.Fa12,
+      metadata: {
+        decimals: token.decimals,
+        name: token.name,
+        symbol: token.symbol,
+        thumbnailUri: token.thumbnail_uri,
+      },
+    },
+    exchangeRate: exchangeRate,
+  };
 }

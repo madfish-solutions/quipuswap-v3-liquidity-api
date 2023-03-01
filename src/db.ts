@@ -2,6 +2,7 @@ import { Pool as PgPool } from "pg";
 import { Kysely, PostgresDialect, Generated } from "kysely";
 
 export interface Pool {
+  id: number;
   address: string;
   token_x_id: number;
   token_y_id: number;
