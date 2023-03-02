@@ -139,7 +139,8 @@ export async function getLiquidityItems(): Promise<LiquidityItemResponse[]> {
       .times(periodsPerYear)
       .times(poolStat.lpFee)
       .times(new BigNumber(1).minus(poolStat.devFee))
-      .div(tvlUsd);
+      .div(tvlUsd)
+      .times(100);
 
     const liquidityItem: LiquidityItem = {
       id: poolStat.id.toFixed(0),
