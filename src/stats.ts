@@ -123,9 +123,14 @@ export async function getLiquidityItems(): Promise<LiquidityItemResponse[]> {
     const tokenYExchangeRate = getExchangeRate(tokenY);
     const tokenXDecimalsDenominator = new BigNumber(10).pow(tokenX.decimals);
     const tokenYDecimalsDenominator = new BigNumber(10).pow(tokenY.decimals);
-    const volumePerPeriodUsd = poolStat.totalDx
-      .div(tokenXDecimalsDenominator)
-      .multipliedBy(tokenXExchangeRate);
+    const volumePerPeriodUsd = BigNumber.max(
+      poolStat.totalDx
+        .div(tokenXDecimalsDenominator)
+        .multipliedBy(tokenXExchangeRate),
+      poolStat.totalDy
+        .div(tokenYDecimalsDenominator)
+        .multipliedBy(tokenYExchangeRate)
+    );
     const periodsPerYear = new BigNumber(365).div(7);
     const tvlUsd = poolStat.tokenXSupply
       .div(tokenXDecimalsDenominator)
