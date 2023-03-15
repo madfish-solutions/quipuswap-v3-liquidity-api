@@ -7,6 +7,7 @@ export interface Pool {
   token_x_id: number;
   token_y_id: number;
   originated_at: Date;
+  sqrt_price: string;
 }
 
 export interface Token {

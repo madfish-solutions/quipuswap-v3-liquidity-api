@@ -22,6 +22,8 @@ import {
 
 const { sum } = db.fn;
 
+const X80_FORMAT_PRECISION_POWER = 80;
+const X80_FORMAT_PRECISION = new BigNumber(2).pow(X80_FORMAT_PRECISION_POWER);
 const WTEZ_ADDRESS =
   process.env.WTEZ_ADDRESS || "KT1UpeXdK6AJbX58GJ92pLZVCucn2DR8Nu4b";
 
@@ -102,10 +104,10 @@ export async function getLiquidityItems(): Promise<LiquidityItemResponse[]> {
 
   const getExchangeRate = (token: Token) => {
     if (token.address === WTEZ_ADDRESS) {
-      return tezExchangeRate;
+      return new BigNumber(tezExchangeRate);
     }
 
-    return (
+    return new BigNumber(
       allExchangeRates.find(
         (exchangeRate) =>
           exchangeRate.tokenAddress === token.address &&
@@ -116,11 +118,23 @@ export async function getLiquidityItems(): Promise<LiquidityItemResponse[]> {
     );
   };
 
-  return poolStats.map((poolStat, idx) => {
+  return poolStats.map((poolStat) => {
     const tokenX = poolStat.tokenX;
     const tokenY = poolStat.tokenY;
-    const tokenXExchangeRate = getExchangeRate(tokenX);
-    const tokenYExchangeRate = getExchangeRate(tokenY);
+    const sqrtPrice = new BigNumber(poolStat.sqrt_price);
+    const priceDecimals = tokenY.decimals - tokenX.decimals;
+    const normalizedPrice = convertToAtomicPrice(sqrtPrice).shiftedBy(
+      -priceDecimals
+    );
+    const originalTokenXExchangeRate = getExchangeRate(tokenX);
+    const originalTokenYExchangeRate = getExchangeRate(tokenY);
+    const tokenXExchangeRate = originalTokenXExchangeRate.isEqualTo(0)
+      ? originalTokenYExchangeRate.multipliedBy(normalizedPrice)
+      : originalTokenXExchangeRate;
+    const tokenYExchangeRate = originalTokenYExchangeRate.isEqualTo(0)
+      ? originalTokenXExchangeRate.dividedBy(normalizedPrice)
+      : originalTokenYExchangeRate;
+
     const tokenXDecimalsDenominator = new BigNumber(10).pow(tokenX.decimals);
     const tokenYDecimalsDenominator = new BigNumber(10).pow(tokenY.decimals);
     const volumePerPeriodUsd = BigNumber.max(
@@ -187,7 +201,7 @@ export async function getLiquidityItems(): Promise<LiquidityItemResponse[]> {
 function makeTokenInfo(
   token: Token,
   tvl: string,
-  exchangeRate: string
+  exchangeRate: BigNumber
 ): TokensInfo {
   return {
     atomicTokenTvl: tvl,
@@ -203,6 +217,15 @@ function makeTokenInfo(
         thumbnailUri: token.thumbnail_uri,
       },
     },
-    exchangeRate: exchangeRate,
+    exchangeRate: exchangeRate.toFixed(),
   };
 }
+
+export const convertToAtomicPrice = (sqrtPrice: BigNumber) => {
+  const defaultDecimalPlaces = BigNumber.config().DECIMAL_PLACES;
+  BigNumber.config({ DECIMAL_PLACES: X80_FORMAT_PRECISION_POWER });
+  const price = new BigNumber(sqrtPrice).div(X80_FORMAT_PRECISION).pow(2);
+  BigNumber.config({ DECIMAL_PLACES: defaultDecimalPlaces });
+
+  return price;
+};
