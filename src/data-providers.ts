@@ -2,12 +2,7 @@ import axios from "axios";
 import BigNumber from "bignumber.js";
 import { db, Token } from "./db";
 import { tezos } from "./tezos";
-
-const FACTORY =
-  process.env.FACTORY_ADDRESS || "KT1JNNMMGyNNy36Zo6pcgRTMLUZyqRrttMZ4";
-const EXCHANGE_RATES_API =
-  process.env.EXCHANGE_RATES_API ||
-  "https://api.templewallet.com/api/exchange-rates";
+import { exchangeRatesApiUrl, factoryAddress } from "./config";
 
 export function fetchAllTokens() {
   return db.selectFrom("token").selectAll().execute();
@@ -25,7 +20,7 @@ export function fetchAllExchangeRates() {
         exchangeRate: string;
         tokenId: number | undefined;
       }>
-    >(EXCHANGE_RATES_API)
+    >(exchangeRatesApiUrl)
     .then((res) => res.data);
 }
 
@@ -41,7 +36,7 @@ export async function fetchTokenById(id: number) {
 }
 
 export async function fetchDevFee() {
-  const contract = await tezos.contract.at(FACTORY);
+  const contract = await tezos.contract.at(factoryAddress);
   const storage = await contract.storage<{
     dev_fee_bps: BigNumber;
   }>();

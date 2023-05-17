@@ -1,7 +1,6 @@
 import express from "express";
 import { getLiquidityItems } from "./stats";
-
-const port = process.env.PORT || 3000;
+import { port } from "./config";
 
 export function bootstrapApp() {
   console.info("bootstrapping app...");
