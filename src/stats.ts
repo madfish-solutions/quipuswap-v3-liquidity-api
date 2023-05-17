@@ -19,13 +19,12 @@ import {
   Standard,
   TokensInfo,
 } from "./types";
+import { wtezAddress } from "./config";
 
 const { sum } = db.fn;
 
 const X80_FORMAT_PRECISION_POWER = 80;
 const X80_FORMAT_PRECISION = new BigNumber(2).pow(X80_FORMAT_PRECISION_POWER);
-const WTEZ_ADDRESS =
-  process.env.WTEZ_ADDRESS || "KT1UpeXdK6AJbX58GJ92pLZVCucn2DR8Nu4b";
 
 const allTokensCache = makeSwrCache(fetchAllTokens, 30000);
 const allPoolsCache = makeSwrCache(fetchAllPools, 30000);
@@ -103,7 +102,7 @@ export async function getLiquidityItems(): Promise<LiquidityItemResponse[]> {
     allExchangeRates[allExchangeRates.length - 1].exchangeRate;
 
   const getExchangeRate = (token: Token) => {
-    if (token.address === WTEZ_ADDRESS) {
+    if (token.address === wtezAddress) {
       return new BigNumber(tezExchangeRate);
     }
 

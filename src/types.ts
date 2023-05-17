@@ -55,13 +55,13 @@ export interface LiquidityItem {
   contractAddress: string;
   id: string;
   type: PoolType;
-  tokensInfo: Array<TokensInfo>; // tokensInfo
-  apr: Nullable<number>; // apr formula provided
-  maxApr: Nullable<number>; // maxApr = apr
-  poolLabels: Array<string>; // labels for the pool = []
-  volumeForWeek: Nullable<string>; // ok
+  tokensInfo: Array<TokensInfo>;
+  apr: Nullable<number>;
+  maxApr: Nullable<number>;
+  poolLabels: Array<string>;
+  volumeForWeek: Nullable<string>;
 
-  totalSupply: string; //
+  totalSupply: string;
   opportunities: [];
   tvlInUsd: string;
 
