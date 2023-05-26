@@ -18,6 +18,8 @@ import {
   PoolType,
   Standard,
   TokensInfo,
+  VolumePair,
+  VolumeStatsUsd,
 } from "./types";
 import { wtezAddress } from "./config";
 
@@ -35,26 +37,16 @@ const devFeeCache = makeSwrCache(fetchDevFee, 60000 * 60 * 6); // not changed to
 const poolStorageCache = makeSwrCache(fetchPoolStorage, 30000);
 const blockCache = makeSwrCache(fetchBlock, 3000);
 
-export async function getPoolStats(days: number): Promise<PoolStat[]> {
+export async function getPoolStats(): Promise<PoolStat[]> {
   const pools = await allPoolsCache.get();
 
   return Promise.all(
     pools.map(async (pool) => {
-      const swaps = await db
-        .selectFrom("swap")
-        .select(sum<string>("dx").as("totalDx"))
-        .select(sum<string>("dy").as("totalDy"))
-        .where("pool_id", "=", pool.address)
-        .where(
-          "timestamp",
-          ">",
-          new Date(Date.now() - days * 24 * 60 * 60 * 1000)
-        )
-        .executeTakeFirst();
-
-      if (!swaps) {
-        throw new Error("failed to aggregate swaps");
-      }
+      const [allTimeSwaps, weeklySwaps, dailySwaps] = await Promise.all([
+        getVolume(pool.address),
+        getVolume(pool.address, 7),
+        getVolume(pool.address, 1),
+      ]);
 
       const [tokenX, tokenY, poolStorage, devFee] = await Promise.all([
         getTokenById(pool.token_x_id),
@@ -77,11 +69,42 @@ export async function getPoolStats(days: number): Promise<PoolStat[]> {
         devFee: devFee,
         lpFee: poolStorage.fee,
         liquidity: poolStorage.liquidity,
-        totalDx: new BigNumber(swaps.totalDx || 0),
-        totalDy: new BigNumber(swaps.totalDy || 0),
+        volume: {
+          allTime: allTimeSwaps,
+          week: weeklySwaps,
+          day: dailySwaps,
+        },
       };
     })
   );
+}
+
+async function getVolume(poolAddress: string, days?: number) {
+  const base = db
+    .selectFrom("swap")
+    .select(sum<string>("dx").as("totalDx"))
+    .select(sum<string>("dy").as("totalDy"))
+    .where("pool_id", "=", poolAddress);
+
+  const full =
+    days !== undefined
+      ? base.where(
+          "timestamp",
+          ">",
+          new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+        )
+      : base;
+
+  const aggregation = await full.executeTakeFirst();
+  if (!aggregation) {
+    throw new Error("failed to aggregate swaps");
+  }
+
+  const { totalDx, totalDy } = aggregation;
+  return {
+    totalDx: new BigNumber(totalDx || 0),
+    totalDy: new BigNumber(totalDy || 0),
+  };
 }
 
 async function getTokenById(id: number) {
@@ -95,7 +118,7 @@ async function getTokenById(id: number) {
 }
 
 export async function getLiquidityItems(): Promise<LiquidityItemResponse[]> {
-  const poolStats = await allPoolStatsCache.get(7);
+  const poolStats = await allPoolStatsCache.get();
   const allExchangeRates = await allExchangeRatesCache.get();
   const block = await blockCache.get();
   const tezExchangeRate =
@@ -136,14 +159,19 @@ export async function getLiquidityItems(): Promise<LiquidityItemResponse[]> {
 
     const tokenXDecimalsDenominator = new BigNumber(10).pow(tokenX.decimals);
     const tokenYDecimalsDenominator = new BigNumber(10).pow(tokenY.decimals);
-    const volumePerPeriodUsd = BigNumber.max(
-      poolStat.totalDx
-        .div(tokenXDecimalsDenominator)
-        .multipliedBy(tokenXExchangeRate),
-      poolStat.totalDy
-        .div(tokenYDecimalsDenominator)
-        .multipliedBy(tokenYExchangeRate)
+
+    const {
+      week: volumePerWeekUsd,
+      day: volumePerDayUsd,
+      allTime: volumeAllTimeUsd,
+    } = getUsdVolumes(
+      poolStat,
+      tokenXExchangeRate,
+      tokenXDecimalsDenominator,
+      tokenYExchangeRate,
+      tokenYDecimalsDenominator
     );
+
     const periodsPerYear = new BigNumber(365).div(7);
     const tvlUsd = poolStat.tokenXSupply
       .div(tokenXDecimalsDenominator)
@@ -153,7 +181,7 @@ export async function getLiquidityItems(): Promise<LiquidityItemResponse[]> {
           .div(tokenYDecimalsDenominator)
           .times(tokenYExchangeRate)
       );
-    const apr = volumePerPeriodUsd
+    const apr = volumePerWeekUsd
       .times(periodsPerYear)
       .times(poolStat.lpFee)
       .times(new BigNumber(1).minus(poolStat.devFee))
@@ -166,10 +194,16 @@ export async function getLiquidityItems(): Promise<LiquidityItemResponse[]> {
       apr: apr.toNumber(),
       maxApr: apr.toNumber(),
       feesRate: "0",
+      feesForDay: volumePerDayUsd
+        .times(poolStat.lpFee)
+        .times(new BigNumber(1).minus(poolStat.devFee))
+        .toFixed(),
       poolLabels: [],
       opportunities: [],
       type: PoolType.UNISWAP,
-      volumeForWeek: volumePerPeriodUsd.toFixed(),
+      volumeForWeek: volumePerWeekUsd.toFixed(),
+      volumeForDay: volumePerDayUsd.toFixed(),
+      volumeForAllTime: volumeAllTimeUsd.toFixed(),
       totalSupply: poolStat.liquidity.toFixed(),
       tvlInUsd: tvlUsd.toFixed(),
       tokensInfo: [
@@ -195,6 +229,31 @@ export async function getLiquidityItems(): Promise<LiquidityItemResponse[]> {
       },
     };
   });
+}
+
+function getUsdVolumes(
+  poolStat: PoolStat,
+  tokenXExchangeRate: BigNumber,
+  tokenXDecimalsDenominator: BigNumber,
+  tokenYExchangeRate: BigNumber,
+  tokenYDecimalsDenominator: BigNumber
+): VolumeStatsUsd {
+  const calculateVolume = (pair: VolumePair) =>
+    BigNumber.max(
+      pair.totalDx
+        .div(tokenXDecimalsDenominator)
+        .multipliedBy(tokenXExchangeRate),
+      pair.totalDy
+        .div(tokenYDecimalsDenominator)
+        .multipliedBy(tokenYExchangeRate)
+    );
+
+  const { week, day, allTime } = poolStat.volume;
+  return {
+    week: calculateVolume(week),
+    day: calculateVolume(day),
+    allTime: calculateVolume(allTime),
+  };
 }
 
 function makeTokenInfo(

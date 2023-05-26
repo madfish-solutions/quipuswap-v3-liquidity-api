@@ -60,6 +60,8 @@ export interface LiquidityItem {
   maxApr: Nullable<number>;
   poolLabels: Array<string>;
   volumeForWeek: Nullable<string>;
+  volumeForDay: Nullable<string>;
+  volumeForAllTime: Nullable<string>;
 
   totalSupply: string;
   opportunities: [];
@@ -69,6 +71,7 @@ export interface LiquidityItem {
   nextDelegate?: string;
   currentDelegate?: string;
   feesRate: string;
+  feesForDay: string;
 }
 
 export interface LiquidityItemResponse {
@@ -93,9 +96,25 @@ export interface StatsInput {
   dexInfo: Array<LiquidityItemResponse>;
 }
 
-export interface PoolStat extends Pool {
+export type VolumePair = {
   totalDx: BigNumber;
   totalDy: BigNumber;
+};
+
+export type VolumeStats = {
+  week: VolumePair;
+  day: VolumePair;
+  allTime: VolumePair;
+};
+
+export type VolumeStatsUsd = {
+  week: BigNumber;
+  day: BigNumber;
+  allTime: BigNumber;
+};
+
+export interface PoolStat extends Pool {
+  volume: VolumeStats;
 
   tokenX: Token;
   tokenY: Token;
